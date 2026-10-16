@@ -1,0 +1,46 @@
+# analytics.mplstyle -- how figures look.
+#
+# Data, not code. Loaded by utilities/plot_config.py and applied per figure,
+# so nothing here mutates global state or depends on import order.
+#
+# Note: 'backend' cannot be set from a style sheet (matplotlib filters it out),
+# so the backend is chosen at the entry point instead.
+
+# ---- Colour ----------------------------------------------------------------
+# matplotlib's default tab10 cycle, written out so the order is fixed
+# regardless of any other style active in the process.
+axes.prop_cycle: cycler('color', ['1f77b4', 'ff7f0e', '2ca02c', 'd62728', '9467bd', '8c564b', 'e377c2', '7f7f7f', 'bcbd22', '17becf'])
+image.cmap: viridis
+
+# ---- Typography ------------------------------------------------------------
+# No specific font is required: matplotlib falls through this list, so a
+# missing font degrades quietly rather than warning on every figure.
+font.family: sans-serif
+font.sans-serif: DejaVu Sans, Helvetica, Arial, sans-serif
+font.size: 12
+axes.titlesize: 14
+axes.labelsize: 12
+xtick.labelsize: 10
+ytick.labelsize: 10
+legend.fontsize: 12
+
+# ---- Axes and grid ---------------------------------------------------------
+axes.facecolor: white
+axes.edgecolor: 333333
+axes.linewidth: 0.8
+axes.grid: True
+axes.axisbelow: True
+axes.spines.top: False
+axes.spines.right: False
+grid.color: d9d9d9
+grid.linewidth: 0.7
+
+# ---- Lines -----------------------------------------------------------------
+lines.linewidth: 1.5
+
+# ---- Output ----------------------------------------------------------------
+# figure.dpi and savefig.dpi are deliberately absent: DPI is a per-run
+# parameter and lives in FigureConfig, not in the theme.
+figure.facecolor: white
+savefig.facecolor: white
+savefig.bbox: tight

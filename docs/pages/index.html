@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Data Analytics Pipeline — demo output</title>
+<style>
+  /* Light is the base; only the tokens change in dark. */
+  :root {
+    --bg: #ffffff;
+    --fg: #1a1a1a;
+    --muted: #5c5c5c;
+    --rule: #e0e0e0;
+    --card: #f7f7f5;
+    --accent: #b25000;
+    --code-bg: #f0f0ee;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14161a;
+      --fg: #e8e6e3;
+      --muted: #a0a0a0;
+      --rule: #2c2f36;
+      --card: #1c1f25;
+      --accent: #ff9d4d;
+      --code-bg: #22262e;
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0 auto;
+    padding: 3rem 1.25rem 5rem;
+    max-width: 46rem;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    font-size: 17px;
+    line-height: 1.6;
+  }
+
+  h1 { font-size: 1.9rem; line-height: 1.2; margin: 0 0 .4rem; }
+  h2 { font-size: 1.2rem; margin: 2.75rem 0 .75rem; }
+  p  { margin: 0 0 1rem; }
+
+  .lede { color: var(--muted); margin-bottom: 2rem; }
+
+  a { color: var(--accent); }
+
+  code {
+    background: var(--code-bg);
+    padding: .12em .38em;
+    border-radius: 3px;
+    font-size: .88em;
+  }
+
+  .card {
+    display: block;
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    background: var(--card);
+    padding: 1.1rem 1.25rem;
+    margin-bottom: .85rem;
+    text-decoration: none;
+    color: inherit;
+  }
+  .card:hover { border-color: var(--accent); }
+  .card strong { display: block; color: var(--accent); margin-bottom: .2rem; }
+  .card span { color: var(--muted); font-size: .93rem; }
+
+  ol, ul { padding-left: 1.3rem; }
+  ol li, ul li { margin-bottom: .5rem; }
+
+  footer {
+    margin-top: 3.5rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--rule);
+    color: var(--muted);
+    font-size: .9rem;
+  }
+</style>
+</head>
+<body>
+
+<h1>Data Analytics Pipeline</h1>
+<p class="lede">
+  Demo output, rebuilt by CI on every push to <code>main</code>. The pipeline generated
+  its own synthetic dataset &mdash; 10 runs across 4 conditions &mdash; and then analysed it.
+  No real data is involved anywhere on this page.
+</p>
+
+<p class="lede">
+  The input format is the project's own: <code>schema.py</code> is the specification and
+  the bundled generator is its reference producer, so a clone can run the whole thing with
+  nothing to download. The metric set is not fixed by the pipeline either &mdash; each file
+  declares its own metrics and the run discovers them.
+</p>
+
+<a class="card" href="report.html">
+  <strong>The report &rarr;</strong>
+  <span>One self-contained HTML file, organised as seven tabs around the questions it answers.
+  Its findings, figures and tables are computed from the data; four clearly labelled AI
+  interpretations sit beside them.</span>
+</a>
+
+<a class="card" href="__REPO_URL__">
+  <strong>The source on GitHub &rarr;</strong>
+  <span>Python, Polars end to end. The README covers the architecture and the design
+  decisions behind it.</span>
+</a>
+
+<h2>AI interpretations in the report</h2>
+
+<p>
+  Before publishing, CI asks a language model (<code>openai/gpt-oss-120b</code> on GroqCloud)
+  four fixed research questions. Each question is given only the statistical tables that
+  bear on it, and its answer appears in that question&rsquo;s tab, in a box headed
+  <em>Groq AI interpretation</em>:
+</p>
+
+<ul class="questions">
+  <li><strong>Conditions</strong> &mdash; which conditions differ, on what, and how confidently?</li>
+  <li><strong>Reproducibility</strong> &mdash; would these differences reproduce?</li>
+  <li><strong>Relationships</strong> &mdash; what relates to the outcome metric, and does it hold inside a run?</li>
+  <li><strong>Multivariable model</strong> &mdash; what does the multivariable model add?</li>
+</ul>
+
+<p>
+  <strong>What is checked.</strong> Every answer must cite its evidence as a table, a row and
+  the numbers in it, and each cited number is compared with the cell it names. An answer that
+  cites a wrong number, a missing value or a table outside its question is sent back with the
+  reason, and the site is only republished when all four answers pass. Each answer lists its
+  limitations, and automated review flags common over-claims beside it.
+</p>
+
+<p>
+  <strong>What is not checked.</strong> The reasoning. A correctly copied number can still be
+  misread, so the interpretations are a starting point for reading the results, not a
+  conclusion. Where an AI box and the report&rsquo;s own findings disagree, the findings
+  &mdash; computed directly from the data &mdash; are the ones to trust.
+</p>
+
+<h2>Ask your own assistant</h2>
+
+<p>
+  Every run also writes the two files behind those answers in full, so you can put your own
+  questions to whichever assistant you use. <code>evidence_pack.json</code> holds every derived
+  statistic, with filesystem paths stripped and run identifiers pseudonymised;
+  <code>prompt.md</code> is the briefing that explains what the numbers mean and which
+  conclusions they will not support.
+</p>
+
+<ol>
+  <li>Download <a href="ai/prompt.md">prompt.md</a> and
+      <a href="ai/evidence_pack.json">evidence_pack.json</a>.</li>
+  <li>Attach both to a conversation with ChatGPT, Claude or another assistant. Attach them as
+      files rather than pasting: the pack is large.</li>
+  <li>Ask for an interpretation, or ask something specific. The briefing tells the assistant
+      how to read the evidence, and the pack includes a table of exactly which metrics this
+      run carried.</li>
+</ol>
+
+<p>
+  The briefing matters because several conclusions that look natural are not supported by this
+  kind of data: a large p-value does not establish equivalence, a pooled correlation is not
+  evidence of a relationship, and an association with signal-to-noise does not mean that raising
+  it would raise the outcome. Without those rules stated next to the numbers, a capable reader
+  &mdash; human or model &mdash; tends to make exactly these mistakes.
+</p>
+
+<footer>
+  Generated by <code>da-pipeline-demo</code>. Source and licence on
+  <a href="__REPO_URL__">GitHub</a>.
+</footer>
+
+</body>
+</html>

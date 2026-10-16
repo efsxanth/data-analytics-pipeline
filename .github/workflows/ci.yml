@@ -1,0 +1,218 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install ruff
+        run: pip install ruff
+
+      - name: Lint
+        run: ruff check src tests
+
+      # No `ruff format --diff` step: the formatter rewraps deliberately aligned
+      # Polars method chains, and adopting its style would rewrite 42 files to no
+      # benefit. `ruff check` above is the part that catches real problems.
+
+  test:
+    name: Test (${{ matrix.os }}, Python ${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
+
+    # Any hang is capped here rather than at the platform ceiling of six hours.
+    timeout-minutes: 20
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # The pipeline is developed on Windows and its config files carry
+        # Windows paths, so Windows is a first-class target rather than an
+        # afterthought. Linux is included because that is where it would run
+        # unattended, on a schedule or from CI.
+        os: [ubuntu-latest, windows-latest]
+        python-version: ["3.11", "3.12", "3.13"]
+
+    env:
+      # Nothing in plotting/figures.py selects a backend, so pin the headless one
+      # rather than relying on autodetection.
+      MPLBACKEND: Agg
+      # Without this, stdout is block-buffered off a terminal and the last log
+      # line printed is not the line the run actually reached.
+      PYTHONUNBUFFERED: "1"
+      PYTHONFAULTHANDLER: "1"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install
+        run: pip install -e ".[dev]"
+
+      # -v names each test before it runs, so a hang is attributable from the log
+      # alone; it overrides the -q in the project's addopts. faulthandler_timeout
+      # is an ini option, not a command-line flag, hence -o: after two minutes
+      # stuck in one test it dumps the stack of every thread.
+      - name: Test
+        run: pytest -v -o faulthandler_timeout=120 --cov=da_pipeline --cov-report=term-missing
+
+  demo:
+    name: Demo runs end to end
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    env:
+      MPLBACKEND: Agg
+      PYTHONUNBUFFERED: "1"
+      PYTHONFAULTHANDLER: "1"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install
+        run: pip install -e .
+
+      # Proves the quickstart in the README still works: generate a synthetic
+      # dataset and analyse it with no inputs of any kind.
+      #
+      # SIGABRT rather than the default SIGTERM, because with PYTHONFAULTHANDLER
+      # set it makes every process print where it was stuck on the way out.
+      - name: Run the demo
+        run: timeout -s ABRT 600 da-pipeline-demo --output_dir demo_data --observations_per_group 40
+
+      - name: Check the expected outputs exist
+        run: |
+          test -f demo_data/Data_Analytics/csv_exports/signal_to_noise.csv
+          test -f demo_data/Data_Analytics/report.html
+          test -f demo_data/Data_Analytics/ai/prompt.md
+          test -f demo_data/Data_Analytics/ai/evidence_pack.json
+          # A glob, not `test -f`: more than one figure matches, and `test` takes
+          # exactly one argument.
+          ls demo_data/Data_Analytics/signal_to_noise/*.png > /dev/null
+          echo "Figures produced: $(find demo_data/Data_Analytics -name '*.png' | wc -l)"
+
+      # The same output the Pages job publishes, kept as an artifact so a failing
+      # or unpublished run can still be inspected.
+      - name: Upload the figures
+        uses: actions/upload-artifact@v4
+        with:
+          name: demo-output
+          path: demo_data/Data_Analytics
+          retention-days: 7
+
+  # ---------------------------------------------------------------------------
+  # Publish the demo output to GitHub Pages, so the report can be read without
+  # cloning anything. Runs only on main, and only after the demo job has proved
+  # the run is good. Nothing is committed: the site is built from the run that
+  # just happened, so the published example cannot drift from the code.
+  #
+  # Needs Pages enabled once, by hand: Settings -> Pages -> Source -> GitHub Actions.
+  # ---------------------------------------------------------------------------
+  publish-demo:
+    name: Publish the demo to Pages
+    needs: demo
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    # Four Groq questions, up to three attempts each, 75 s apart to respect
+    # the free tier's tokens-per-minute limit: at most ~15 minutes of requests.
+    timeout-minutes: 25
+
+    permissions:
+      contents: read
+      actions: read     # to pull the demo job's artifact
+      pages: write
+      id-token: write
+
+    # Two deployments cannot be in flight at once, and a superseded one should
+    # finish rather than be cancelled halfway.
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+
+    steps:
+      # Only for docs/pages/index.html; the site content comes from the artifact.
+      - uses: actions/checkout@v4
+
+      # Published bytes are the ones the demo job already checked, rather than a
+      # second run that could differ from the one that passed.
+      - name: Fetch the demo output
+        uses: actions/download-artifact@v4
+        with:
+          name: demo-output
+          path: _site
+
+      # Groq runs only in the publishing job, never in the offline test matrix.
+      # A failed or incomplete interpretation stops deployment and preserves
+      # the previous published Pages site.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install report dependencies
+        run: pip install -e .
+
+      - name: Generate four required Groq interpretations
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          # Keeps progress lines in order with any traceback on stderr.
+          PYTHONUNBUFFERED: "1"
+          # The 120B model copies cited numbers far more reliably than the
+          # 20B one, under the same free-tier limits. Remove to use the default.
+          GROQ_MODEL_NAME: openai/gpt-oss-120b
+          # A rejected answer is asked again with the validator's reason.
+          GROQ_MAX_ATTEMPTS: "3"
+        run: python scripts/build_ai_report.py --output-dir _site
+
+      - name: Assemble the site
+        run: |
+          # The pack is pseudonymised and this file is what undoes that. It says so
+          # itself -- "do not send this file with it" -- and publishing it beside the
+          # pack would defeat the whole point of writing it separately. Harmless for
+          # synthetic data, wrong as a habit, and this site is the worked example.
+          rm -f _site/ai/run_id_mapping.json
+          cp docs/pages/index.html _site/index.html
+          # The landing page is a static file in the repository, so it cannot know
+          # where it was deployed from. Filled in here instead of hardcoding a URL
+          # that breaks the moment the repository is renamed or forked.
+          sed -i "s|__REPO_URL__|${{ github.server_url }}/${{ github.repository }}|g" _site/index.html
+          # Jekyll is on by default and skips paths beginning with an underscore.
+          touch _site/.nojekyll
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy
+        id: deploy
+        uses: actions/deploy-pages@v4

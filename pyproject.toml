@@ -1,0 +1,127 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "da-pipeline"
+dynamic = ["version"]
+description = "Offline analytics pipeline comparing quality metrics across experimental conditions, with the run as the unit of analysis and a discovered, open-ended metric set, plus citation-verified LLM interpretations for the published report"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+keywords = [
+    "analytics", "data-pipeline", "statistics", "polars", "hdf5",
+    "experimental-design", "reproducibility", "effect-size", "visualization",
+    "repeated-measures", "variance-decomposition",
+    "llm", "langchain", "groq", "structured-output",
+]
+
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+    "Topic :: Scientific/Engineering :: Visualization",
+]
+
+dependencies = [
+    "h5py>=3.10",
+    "matplotlib>=3.8",
+    "numpy>=1.26",
+    "polars>=1.36,<2.0",
+    # Not used by this codebase, which is Polars throughout. Seaborn reads a
+    # Polars frame through the Arrow PyCapsule interface, and without pyarrow
+    # that handoff raises rather than falling back, so every figure fails on an
+    # otherwise complete install. It was previously satisfied by accident.
+    "pyarrow>=14",
+    "scipy>=1.11",
+    "seaborn>=0.13",
+    "pydantic>=2,<3",
+    "langchain-core>=0.3,<2",
+    "langchain-groq>=0.3,<2",
+    "python-dotenv>=1,<2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "ruff>=0.6",
+]
+
+[project.scripts]
+da-pipeline = "da_pipeline.pipeline:main"
+da-pipeline-demo = "da_pipeline.demo:main"
+
+[tool.hatch.version]
+path = "src/da_pipeline/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/da_pipeline"]
+
+# =====================================================================================================================
+# pytest
+# =====================================================================================================================
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q --strict-markers"
+filterwarnings = [
+    "error",
+    # Seaborn still reaches for a few APIs matplotlib has scheduled for removal.
+    "ignore::DeprecationWarning:seaborn.*",
+    "ignore::PendingDeprecationWarning",
+]
+markers = [
+    "slow: end-to-end runs that render figures (deselect with '-m \"not slow\"')",
+]
+
+# =====================================================================================================================
+# ruff
+# =====================================================================================================================
+
+[tool.ruff]
+# The codebase lays out its section banners and aligned trailing comments to
+# roughly this width; 88 would reflow comments that are deliberately shaped.
+line-length = 120
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # import sorting
+    "B",    # bugbear
+    "UP",   # pyupgrade
+    "C4",   # comprehensions
+    "SIM",  # simplify
+]
+ignore = [
+    # The pipeline's log lines are f-strings by convention, and they are cheap:
+    # every one of them is at INFO and INFO is always on for a run.
+    "G004",
+    # Assigning a lambda is used deliberately for one-line formatters.
+    "E731",
+    # zip(strict=) would turn several currently-silent length mismatches into
+    # exceptions. Those call sites are guarded by explicit co-indexing checks
+    # instead (see DataExtractor._check_co_indexed); turning the rule on is a
+    # behaviour change that belongs in its own commit, not a lint sweep.
+    "B905",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests assert on internal invariants freely.
+"tests/*" = ["B011"]
+# Every name here is re-exported deliberately.
+"src/da_pipeline/constants/__init__.py" = ["F401"]
+# Almost the whole file is one Markdown template destined for a file on disk,
+# not source. Its table rows cannot be wrapped without breaking the Markdown,
+# and reflowing its prose to suit a linter would make the briefing worse.
+"src/da_pipeline/reporting/prompt.py" = ["E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["da_pipeline"]

@@ -1,0 +1,51 @@
+# Virtual environment
+.venv/
+venv/
+
+# PyCharm
+.idea/
+*.iml
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Packaging / build
+build/
+dist/
+*.egg-info/
+
+# Environment variables
+.env
+
+# Testing and coverage
+.pytest_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# ---------------------------------------------------------------------------
+# Data
+# ---------------------------------------------------------------------------
+# Extract files are large and are not ours to publish: they live outside the
+# repository and must stay there. Anything a reader needs to run the pipeline
+# is produced on demand by `da-pipeline-demo`.
+*.h5
+*.hdf5
+data/
+demo_data/
+
+# Pipeline results, in case anyone points a run at the repository.
+Data_Analytics/
+Data_Analytics_*/
+
+# One-off scripts that migrate a local dataset into the layout below. They
+# necessarily pair the current names with whatever the files used before, so
+# committing one would publish exactly the mapping this layout exists to avoid.
+rebuild_h5.py
+migrate_*.py
+
+# Windows
+desktop.ini
+Thumbs.db
